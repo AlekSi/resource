@@ -70,7 +70,7 @@ func Track[T any](resource *T, h *Handle) {
 		panic("handle must not be nil")
 	}
 
-	h.typ = reflect.TypeOf(resource).String()
+	h.typ = reflect.TypeOf(*resource).String()
 
 	if collectStack {
 		// It would be nice to access pprof.Profile's PCs.

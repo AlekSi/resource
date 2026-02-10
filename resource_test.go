@@ -52,7 +52,7 @@ var globalResource *Resource
 func TestTrackUntrack(t *testing.T) {
 	cleanup = origCleanup
 
-	profile := "resource/*resource.Resource"
+	profile := "resource/resource.Resource"
 
 	runtime.GC()
 
@@ -131,7 +131,7 @@ func TestUntrackConcurrently(t *testing.T) {
 	res := &Resource{h: NewHandle()}
 	Track(res, res.h)
 
-	profile := "resource/*resource.Resource"
+	profile := "resource/resource.Resource"
 	assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 	// do a bit more work to reduce a chance that one goroutine would finish
@@ -171,7 +171,7 @@ func TestUntrackConcurrently(t *testing.T) {
 func TestStacks(t *testing.T) {
 	cleanup = origCleanup
 
-	profile := "resource/*resource.Resource"
+	profile := "resource/resource.Resource"
 
 	h := NewHandle()
 	ch := make(chan string, 1)
@@ -196,7 +196,7 @@ func TestStacks(t *testing.T) {
 	msg := <-ch
 	t.Logf("stack:\n%s", msg)
 
-	// *resource.Resource became unreachable without being released!
+	// resource.Resource became unreachable without being released!
 	// It started being tracked at:
 	// github.com/AlekSi/resource.TestStacks
 	// 	testtrack.go:400
@@ -205,7 +205,7 @@ func TestStacks(t *testing.T) {
 	// runtime.goexit
 	// 	/opt/homebrew/Cellar/go/1.25.7_1/libexec/src/runtime/asm_arm64.s:1268
 	expected := []*regexp.Regexp{
-		0: regexp.MustCompile(`^\Q*resource.Resource became unreachable without being released!\E$`),
+		0: regexp.MustCompile(`^\Qresource.Resource became unreachable without being released!\E$`),
 		1: regexp.MustCompile(`^\QIt started being tracked at:\E$`),
 		2: regexp.MustCompile(`^\Qgithub.com/AlekSi/resource.TestStacks\E$`),
 		3: regexp.MustCompile(`^\ttesttrack\.go:400$`),
@@ -240,11 +240,11 @@ func TestStacks(t *testing.T) {
 	lines = strings.Split(msg, "\n")
 	assertEqual(t, 6, len(lines))
 
-	// resource/*resource.Resource profile: total 1
+	// resource/resource.Resource profile: total 1
 	// 1 @ 0x104cdaf98 0x104c9f0d8 0x104c41d44
 	// #       0x104cdaf97     github.com/AlekSi/resource.TestStacks+0x177     testtrack.go:400
 	// #       0x104c9f0d7     testing.tRunner+0xc7                            /<goroot>/testing/testing.go:1934
-	assertEqual(t, "resource/*resource.Resource profile: total 1", lines[0])
+	assertEqual(t, "resource/resource.Resource profile: total 1", lines[0])
 	assertEqual(t, true, strings.Contains(lines[1], " @ 0x"))
 	assertEqual(t, true, strings.Contains(lines[2], "github.com/AlekSi/resource.TestStacks"))
 	assertEqual(t, true, strings.Contains(lines[2], "testtrack.go:400"))
@@ -266,5 +266,5 @@ func Example() {
 	runtime.GC()
 
 	// Output:
-	// *resource.Resource wasn't released!
+	// resource.Resource wasn't released!
 }

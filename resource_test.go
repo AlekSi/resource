@@ -52,9 +52,14 @@ var globalResource *Resource
 func TestTrackUntrack(t *testing.T) {
 	cleanup = origCleanup
 
-	name := profileName(globalResource)
+	profile := "resource/*resource.Resource"
 
 	runtime.GC()
+
+	t.Run("UntrackWithoutTrack", func(t *testing.T) {
+		res := &Resource{h: NewHandle()}
+		Untrack(res, res.h)
+	})
 
 	t.Run("LocalUntrack", func(t *testing.T) {
 		res := &Resource{h: NewHandle()}
@@ -62,13 +67,13 @@ func TestTrackUntrack(t *testing.T) {
 //line testtrack.go:100
 		Track(res, res.h)
 
-		assertEqual(t, 1, pprof.Lookup(name).Count())
+		assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 		Untrack(res, res.h)
 
 		runtime.GC()
 
-		assertEqual(t, 0, pprof.Lookup(name).Count())
+		assertEqual(t, 0, pprof.Lookup(profile).Count())
 	})
 
 	t.Run("LocalCleanup", func(t *testing.T) {
@@ -85,17 +90,17 @@ func TestTrackUntrack(t *testing.T) {
 //line testtrack.go:200
 		Track(res, res.h)
 
-		assertEqual(t, 1, pprof.Lookup(name).Count())
+		assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 		runtime.GC()
 		msg := <-ch
 
 		assertEqual(t, true, strings.Contains(msg, "testtrack.go:200"))
-		assertEqual(t, 1, pprof.Lookup(name).Count())
+		assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 		// remove profile manually to support `go test -count=X`
-		pprof.Lookup(name).Remove(h)
-		assertEqual(t, 0, pprof.Lookup(name).Count())
+		pprof.Lookup(profile).Remove(h)
+		assertEqual(t, 0, pprof.Lookup(profile).Count())
 	})
 
 	t.Run("Global", func(t *testing.T) {
@@ -104,17 +109,17 @@ func TestTrackUntrack(t *testing.T) {
 //line testtrack.go:300
 		Track(globalResource, globalResource.h)
 
-		assertEqual(t, 1, pprof.Lookup(name).Count())
+		assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 		runtime.GC()
 
-		assertEqual(t, 1, pprof.Lookup(name).Count())
+		assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 		Untrack(globalResource, globalResource.h)
 
 		runtime.GC()
 
-		assertEqual(t, 0, pprof.Lookup(name).Count())
+		assertEqual(t, 0, pprof.Lookup(profile).Count())
 	})
 
 	runtime.GC()
@@ -126,8 +131,8 @@ func TestUntrackConcurrently(t *testing.T) {
 	res := &Resource{h: NewHandle()}
 	Track(res, res.h)
 
-	name := profileName(res)
-	assertEqual(t, 1, pprof.Lookup(name).Count())
+	profile := "resource/*resource.Resource"
+	assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 	// do a bit more work to reduce a chance that one goroutine would finish
 	// before the other one is still being created
@@ -158,7 +163,7 @@ func TestUntrackConcurrently(t *testing.T) {
 
 	wg.Wait()
 
-	assertEqual(t, 0, pprof.Lookup(name).Count())
+	assertEqual(t, 0, pprof.Lookup(profile).Count())
 
 	runtime.GC()
 }
@@ -166,7 +171,7 @@ func TestUntrackConcurrently(t *testing.T) {
 func TestStacks(t *testing.T) {
 	cleanup = origCleanup
 
-	name := profileName(globalResource)
+	profile := "resource/*resource.Resource"
 
 	h := NewHandle()
 	ch := make(chan string, 1)
@@ -175,8 +180,8 @@ func TestStacks(t *testing.T) {
 		cleanup = origCleanup
 
 		// remove profile manually to support `go test -count=X`
-		pprof.Lookup(name).Remove(h)
-		assertEqual(t, 0, pprof.Lookup(name).Count())
+		pprof.Lookup(profile).Remove(h)
+		assertEqual(t, 0, pprof.Lookup(profile).Count())
 	})
 	cleanup = func(h *Handle) {
 		ch <- h.buildPanicMsg()
@@ -225,21 +230,21 @@ func TestStacks(t *testing.T) {
 		}
 	}
 
-	assertEqual(t, 1, pprof.Lookup(name).Count())
+	assertEqual(t, 1, pprof.Lookup(profile).Count())
 
 	var buf strings.Builder
-	assertEqual(t, nil, pprof.Lookup(name).WriteTo(&buf, 1))
+	assertEqual(t, nil, pprof.Lookup(profile).WriteTo(&buf, 1))
 	msg = buf.String()
 	t.Logf("pprof stack:\n%s", msg)
 
 	lines = strings.Split(msg, "\n")
 	assertEqual(t, 6, len(lines))
 
-	// resource/resource.Resource profile: total 1
+	// resource/*resource.Resource profile: total 1
 	// 1 @ 0x104cdaf98 0x104c9f0d8 0x104c41d44
 	// #       0x104cdaf97     github.com/AlekSi/resource.TestStacks+0x177     testtrack.go:400
 	// #       0x104c9f0d7     testing.tRunner+0xc7                            /<goroot>/testing/testing.go:1934
-	assertEqual(t, "resource/resource.Resource profile: total 1", lines[0])
+	assertEqual(t, "resource/*resource.Resource profile: total 1", lines[0])
 	assertEqual(t, true, strings.Contains(lines[1], " @ 0x"))
 	assertEqual(t, true, strings.Contains(lines[2], "github.com/AlekSi/resource.TestStacks"))
 	assertEqual(t, true, strings.Contains(lines[2], "testtrack.go:400"))

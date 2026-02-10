@@ -70,8 +70,19 @@ func Track[T any](resource *T, h *Handle) {
 		panic("handle must not be nil")
 	}
 
+	h.typ = reflect.TypeOf(resource).String()
+
+	if collectStack {
+		// It would be nice to access pprof.Profile's PCs.
+		// Unfortunately, the only way to get them is through p.WriteTo,
+		// and parsing text or protobuf would be overkill.
+		stk := make([]uintptr, 32)
+		n := runtime.Callers(2, stk[:])
+		h.pcs = stk[:n]
+	}
+
 	if pprofEnabled {
-		profile := profileName(resource)
+		profile := pprofPrefix + h.typ
 
 		// fast path
 
@@ -97,24 +108,15 @@ func Track[T any](resource *T, h *Handle) {
 		h.profile = profile
 	}
 
-	h.typ = reflect.TypeOf(resource).String()
-
-	if collectStack {
-		// It would be nice to access pprof.Profile's PCs.
-		// Unfortunately, the only way to get them is through p.WriteTo,
-		// and parsing text or protobuf would be overkill.
-		stk := make([]uintptr, 32)
-		n := runtime.Callers(2, stk[:])
-		h.pcs = stk[:n]
-	}
-
 	c := runtime.AddCleanup(resource, cleanup, h)
 	h.c.Store(&c)
 }
 
 // Untrack stops tracking the lifetime of an resource.
 //
-// It is safe to call this function multiple times concurrently.
+// It is safe to call this function multiple times and/or concurrently.
+// It is also safe to call it on a resource that was not passed to [Track]
+// (but the handle must still be non-nil and created with [NewHandle]).
 func Untrack[T any](resource *T, h *Handle) {
 	if resource == nil {
 		panic("resource must not be nil")
@@ -132,16 +134,8 @@ func Untrack[T any](resource *T, h *Handle) {
 	runtime.KeepAlive(resource)
 
 	if pprofEnabled {
-		p := pprof.Lookup(h.profile)
-		if p == nil {
-			panic("resource is not tracked")
+		if p := pprof.Lookup(h.profile); p != nil {
+			p.Remove(h)
 		}
-
-		p.Remove(h)
 	}
-}
-
-// profileName return pprof profile name for the given pointer.
-func profileName(resource any) string {
-	return pprofPrefix + reflect.TypeOf(resource).Elem().String()
 }

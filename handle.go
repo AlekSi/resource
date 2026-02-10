@@ -24,8 +24,10 @@ import (
 // Handle holds the [runtime.Cleanup] to stop resource lifetime tracking.
 //
 // It must be created with [NewHandle].
-// It must be passed to [Track] and [Untrack].
+// It must be passed to [Track] and [Untrack] together with the resource.
 // Just creating and storing a handle does not enable tracking.
+//
+// It must not be used for tracking multiple resources.
 //
 // It is recommended to store it as non-embedded pointer field of a resource struct being tracked.
 type Handle struct {
